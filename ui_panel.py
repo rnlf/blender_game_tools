@@ -32,6 +32,11 @@ class MakeDepthMap(bpy.types.Operator):
     bl_label = "Make Depth Map"
 
     def invoke(self, context, event):
+        engine = bpy.data.scenes["Scene"].render.engine
+        use_aa = bpy.data.scenes["Scene"].render.use_antialiasing
+        bpy.data.scenes["Scene"].render.use_antialiasing = False
+        
+        bpy.data.scenes["Scene"].render.engine = "BLENDER_RENDER"
         set_image_settings('RGB')
         
         use_compositor = bpy.data.scenes["Scene"].use_nodes
@@ -71,6 +76,8 @@ class MakeDepthMap(bpy.types.Operator):
         # Set nearest visible y coord as 0 output distance
         renderMat.node_tree.nodes['LowerEdge'].inputs[1].default_value = -iy
         
+        renderMat.node_tree.nodes['ZScale'].inputs[1].default_value = cos(a)
+        
         scale = (ry / 256) * cos(a) / sy
         print(scale)
         renderMat.node_tree.nodes['Scale'].inputs[1].default_value = scale
@@ -98,6 +105,8 @@ class MakeDepthMap(bpy.types.Operator):
         bpy.data.images['Render Result'].save_render(make_outname('_depth'))                
 
         bpy.data.scenes["Scene"].use_nodes = use_compositor
+        bpy.data.scenes["Scene"].render.engine = engine
+        bpy.data.scenes["Scene"].render.use_antialiasing = use_aa
         
         return {"FINISHED"}
 
