@@ -1,5 +1,7 @@
 # What's This?
 
+![screenshot](https://raw.githubusercontent.com/rnlf/blender_game_tools/master/example.gif)
+
 A script for blender that allows rendering orthographics depth maps in screen space. The rendered depth map will be a 8BPP RGB PNG with the 16 bit depth map encoded in the red and green channels.
 
 The red channel gets the lower 8 bit, the green channel the upper 8. Depth value 0 will be the depth value of a Z (vertical) distance of 0 from the lowest point visable in the rendered image.
@@ -7,6 +9,12 @@ The red channel gets the lower 8 bit, the green channel the upper 8. Depth value
 An increase of 1 represents a depth increase equal to the increase from the lowest to the second to lowest row in the rendered image at Z position 0.
 
 At the moment the script only works for orthographics cameras with a Euler rotations of 0 around Y and Z and (hopefully) arbitrary rotations around X. I have only tested it with 60° rotated cameras though.
+
+This is what the rendered files look like that were used to create the example above:
+
+![screenshot](https://raw.githubusercontent.com/rnlf/blender_game_tools/master/example_color.png)
+![screenshot](https://raw.githubusercontent.com/rnlf/blender_game_tools/master/example_depth.png)
+
 
 # Installation
 
