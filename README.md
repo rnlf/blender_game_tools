@@ -37,7 +37,7 @@ After that, objects must be rendered with depth testing (or an equivalent shader
 To convert object coordinates from the the original XYZ coords to on-screen X'Y' and depth coords, the following formulas should work:
 
 - X' = X
-- Y' = Y * cos(alpha) + Z
+- Y' = Y * cos(alpha) + Z * sin(alpha)
 - depth = RenderHeight - (Y - Z) * cos(alpha)
 
 alpha is the Euler angle around the X axis that was used when rendering the images, RenderHeight is the height of the images that were rendered.
