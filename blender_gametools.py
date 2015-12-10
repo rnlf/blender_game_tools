@@ -1,16 +1,122 @@
 import bpy
+import bmesh
 from math import cos, sin, tan
+from mathutils import Vector
 
-def make_outname(suffix):
+def make_outname(suffix, removeEnding=False):
     f = bpy.data.scenes["Scene"].render.filepath
     x = f.rfind('.')
-    return f[0:x] + suffix + f[x:]
+    return f[0:x] + suffix + (f[x:] if not removeEnding else "")
 
 
 def set_image_settings(mode):
     bpy.data.scenes["Scene"].render.image_settings.file_format = "PNG"
     bpy.data.scenes["Scene"].render.image_settings.color_depth = '8'
     bpy.data.scenes["Scene"].render.image_settings.color_mode = mode
+
+
+def worldToGameLoc(v):
+    # Render resolution, required for orthographic image size
+    rx = bpy.data.scenes[0].render.resolution_x
+    ry = bpy.data.scenes[0].render.resolution_y
+            
+    # Find intersection between lower bound of ortho camera and zero-plane
+    # It will be the nearest visible y coord in the depth map
+    sy = 0
+    sx = 0
+    os = bpy.data.scenes[0].camera.data.ortho_scale
+    if rx > ry:
+        sy = ry / rx * os
+        sx = os            
+    else:
+        sy = os
+        sx = rx / ry * os  
+         
+    rp = bpy.data.scenes[0].render.resolution_percentage
+    w = v + Vector([sx/2,sy/(2*cos(bpy.data.scenes[0].camera.rotation_euler.x)),0])
+    w.x *= rx * rp / (100.0 * os)
+    w.y *= ry * rp / (100.0 * os)
+    w.z *= ry * rp / (100.0 * os)
+    
+    w.x = round(w.x, 2)
+    w.y = round(w.y, 2)
+    w.z = round(w.z, 2)
+    
+    return w
+    
+
+class MakeObjectFile(bpy.types.Operator):
+    bl_idname = "scene.export_game_objects"
+    bl_label = "Export Game Objects"
+
+    def invoke(self, context, event):
+
+        layernum = bpy.data.scenes[0].namedlayers.layers.find("Objects")
+        s = bpy.data.scenes[0].camera.data.ortho_scale
+        with open(make_outname("_objects.lua", True), "w") as f:
+            f.write("return {\n")
+            for o in filter(lambda x: x.layers[layernum], bpy.data.objects):
+                f.write("  [\"" + o.name + "\"] = {\n")
+                f.write("    pos = { " + (", ".join(map(str, worldToGameLoc(o.location)))) + " },\n")
+                for p in o.game.properties:
+                    v = ""
+                    if p.type == "STRING":
+                        v = "\"" + p.value + "\""
+                    elif p.type in ["FLOAT", "INT", "TIMER"]:
+                        v = str(p.value)
+                    elif p.type == "BOOL":
+                        v = "true" if p.value else "false"
+                    pass
+                    f.write("    " + p.name + " = " + v + ",\n")
+                f.write("  },\n")
+            f.write("}")
+
+        return {"FINISHED"}
+
+class MakeCollisionFile(bpy.types.Operator):
+    bl_idname = "scene.make_game_collision_file"
+    bl_label = "Make Game Collision Mesh Files"
+
+    def invoke(self, context, event):
+
+        collision = bpy.data.meshes["Collision"]
+        cc = bmesh.new()
+        cc.from_mesh(collision)
+
+        bmesh.ops.triangulate(cc, faces=cc.faces)
+
+        
+        with open(make_outname("_collision.lua", True), "w") as of:
+                
+
+            of.write("return {\n")
+            for f in cc.faces:
+                of.write("  { verts = {\n")
+                vs = sorted(f.verts, key=lambda x: x.index)
+                for v in vs:
+                    of.write("      {" + ", ".join(map(str, worldToGameLoc(v.co))) + "},\n")
+            
+                of.write("    },\n    neighbors = { ")
+                
+                for i in range(3):
+                    for e in f.edges:
+                        if vs[i] in e.verts and vs[(i-1)%3] in e.verts:
+                            if len(e.link_faces) == 2:
+                                if e.link_faces[0] == f:
+                                    of.write(str(e.link_faces[1].index + 1) + ", ")
+                                else:
+                                    of.write(str(e.link_faces[0].index + 1) + ", ")
+                            else:
+                                of.write("-1, ")
+                                
+                
+                of.write("}\n  }, \n")
+                
+            of.write("}\n")
+            cc.free()
+
+        return {"FINISHED"}
+
 
 class MakeGameFiles(bpy.types.Operator):
     bl_idname = "scene.make_game_files"
@@ -23,7 +129,8 @@ class MakeGameFiles(bpy.types.Operator):
         bpy.ops.render.render()
         bpy.data.images['Render Result'].save_render(make_outname('_color'))
         
-        
+        bpy.ops.scene.make_game_collision_file('INVOKE_DEFAULT')
+        bpy.ops.scene.export_game_objects('INVOKE_DEFAULT')
 
         return {"FINISHED"}
 
@@ -129,22 +236,27 @@ class DepthMapRenderPanel(bpy.types.Panel):
         row.operator("scene.make_game_files")        
 
         row = layout.row()
-#        row.scale_y = 3.0
         row.operator("scene.make_depth_map")
-
-
+        row = layout.row()
+        row.operator("scene.make_game_collision_file")
+        row = layout.row()
+        row.operator("scene.export_game_objects")
 
 
 def register():
-    bpy.utils.register_class(DepthMapRenderPanel)
     bpy.utils.register_class(MakeDepthMap)
     bpy.utils.register_class(MakeGameFiles)    
+    bpy.utils.register_class(MakeCollisionFile)
+    bpy.utils.register_class(MakeObjectFile)
+    bpy.utils.register_class(DepthMapRenderPanel)
 
 
 def unregister():
     bpy.utils.unregister_class(DepthMapRenderPanel)
+    bpy.utils.register_class(MakeObjectFile)
     bpy.utils.unregister_class(MakeDepthMap)
     bpy.utils.unregister_class(MakeGameFiles)
+    bpy.utils.unregister_class(MakeCollisionFile)
 
 if __name__ == "__main__":
     register()
