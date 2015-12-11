@@ -53,6 +53,23 @@ def worldToGameLoc(v):
     
     return w
     
+class MakeTriggerFile(bpy.types.Operator):
+    bl_idname = "scene.export_triggers"
+    bl_label = "Export Triggers"
+
+    def invoke(self, context, event):  
+        layernum = bpy.data.scenes[0].namedlayers.layers.find("Triggers")          
+        with open(make_outname("_triggers.lua", True), "w") as f:
+            f.write("return {\n")
+            for o in filter(lambda x: x.layers[layernum], bpy.data.objects):
+                s = o.scale * o.empty_draw_size
+                
+                f.write("  [\"" + o.name + "\"] = {\n")
+                f.write("    min = {" + ", ".join(map(str, worldToGameLoc(o.location - s / 2))) + "},\n")
+                f.write("    max = {" + ", ".join(map(str, worldToGameLoc(o.location + s / 2))) + "}\n")                
+                f.write("  }\n")
+            f.write("}\n")
+        return {"FINISHED"}
 
 class MakeObjectFile(bpy.types.Operator):
     bl_idname = "scene.export_game_objects"
@@ -61,7 +78,7 @@ class MakeObjectFile(bpy.types.Operator):
     def invoke(self, context, event):
 
         layernum = bpy.data.scenes[0].namedlayers.layers.find("Objects")
-        s = bpy.data.scenes[0].camera.data.ortho_scale
+
         with open(make_outname("_objects.lua", True), "w") as f:
             f.write("return {\n")
             for o in filter(lambda x: x.layers[layernum], bpy.data.objects):
@@ -143,6 +160,7 @@ class MakeGameFiles(bpy.types.Operator):
         
         bpy.ops.scene.make_game_collision_file('INVOKE_DEFAULT')
         bpy.ops.scene.export_game_objects('INVOKE_DEFAULT')
+        bpy.ops.scene.export_triggers('INVOKE_DEFAULT')
 
         return {"FINISHED"}
 
@@ -255,14 +273,17 @@ class DepthMapRenderPanel(bpy.types.Panel):
         row.operator("scene.make_game_collision_file")
         row = layout.row()
         row.operator("scene.export_game_objects")
-
+        row = layout.row()
+        row.operator("scene.export_triggers")
 
 def register():
     bpy.utils.register_class(MakeDepthMap)
     bpy.utils.register_class(MakeGameFiles)    
     bpy.utils.register_class(MakeCollisionFile)
     bpy.utils.register_class(MakeObjectFile)
+    bpy.utils.register_class(MakeTriggerFile)
     bpy.utils.register_class(DepthMapRenderPanel)
+    
 
 
 def unregister():
@@ -271,6 +292,7 @@ def unregister():
     bpy.utils.unregister_class(MakeDepthMap)
     bpy.utils.unregister_class(MakeGameFiles)
     bpy.utils.unregister_class(MakeCollisionFile)
+    bpy.utils.unregister_class(MakeTriggerFile)
 
 if __name__ == "__main__":
     register()
