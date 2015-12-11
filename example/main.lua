@@ -89,12 +89,16 @@ function triangleArea(v1, v2, v3)
 end
 
 
+print(triangleArea({0,0}, {10,5}, {3,8}))
+
 
 function heightOnTriangle(p, verts)
 	local at = triangleArea(verts[1], verts[2], verts[3])
 	local a1 = triangleArea(p, verts[2], verts[3])
 	local a2 = triangleArea(p, verts[1], verts[3])
 	local a3 = triangleArea(p, verts[1], verts[2])
+
+  --print("H: " .. at .. ", " .. a1 .. " + " .. a2 .. " + " .. a3 .. " = " .. (a1+a2+a3))
 
 	return (verts[1][3] * a1 + verts[2][3] * a2 + verts[3][3] * a3) / at
 end
@@ -176,7 +180,7 @@ function love.update(dt)
 		local inside = pointInTriangle({bx, bz}, t.verts)
 		if inside then
       intri = t
-			h = heightOnTriangle({bx, 1200-bz}, t.verts)
+			h = heightOnTriangle({bx, bz}, t.verts)
 		end
   end
 end
