@@ -16,6 +16,7 @@ def set_image_settings(mode):
 
 
 def worldToGameLoc(v):
+    print(v)
     # Render resolution, required for orthographic image size
     rx = bpy.data.scenes[0].render.resolution_x
     ry = bpy.data.scenes[0].render.resolution_y
@@ -25,18 +26,26 @@ def worldToGameLoc(v):
     sy = 0
     sx = 0
     os = bpy.data.scenes[0].camera.data.ortho_scale
+
     if rx > ry:
         sy = ry / rx * os
-        sx = os            
+        sx = os
     else:
         sy = os
         sx = rx / ry * os  
-         
+
+
     rp = bpy.data.scenes[0].render.resolution_percentage
-    w = v + Vector([sx/2,sy/(2*cos(bpy.data.scenes[0].camera.rotation_euler.x)),0])
-    w.x *= rx * rp / (100.0 * os)
-    w.y *= ry * rp / (100.0 * os)
-    w.z *= ry * rp / (100.0 * os)
+    c = bpy.data.scenes[0].camera.rotation_euler.x
+    print(c)
+    w = v + Vector([sx/2,sy/(2*cos(c)),0])
+
+
+    
+ 
+    w.x *= rx * rp / (100.0 *  sx) # os * (rx / ry))
+    w.y *= ry * rp / (100.0 *  sy) # os)
+    w.z *= rx * rp / (100.0 *  sx)
     
     w.x = round(w.x, 2)
     w.y = round(w.y, 2)
@@ -78,14 +87,17 @@ class MakeCollisionFile(bpy.types.Operator):
     bl_label = "Make Game Collision Mesh Files"
 
     def invoke(self, context, event):
-
-        collision = bpy.data.meshes["Collision"]
+        obj = bpy.data.objects["Collision"]
+        mat = obj.matrix_world
+        #collision = bpy.data.meshes["Collision"]
+        collision = obj.data
         cc = bmesh.new()
         cc.from_mesh(collision)
 
         bmesh.ops.triangulate(cc, faces=cc.faces)
 
         
+
         with open(make_outname("_collision.lua", True), "w") as of:
                 
 
@@ -94,7 +106,7 @@ class MakeCollisionFile(bpy.types.Operator):
                 of.write("  { verts = {\n")
                 vs = sorted(f.verts, key=lambda x: x.index)
                 for v in vs:
-                    of.write("      {" + ", ".join(map(str, worldToGameLoc(v.co))) + "},\n")
+                    of.write("      {" + ", ".join(map(str, worldToGameLoc(mat * v.co))) + "},\n")
             
                 of.write("    },\n    neighbors = { ")
                 
@@ -141,6 +153,8 @@ class MakeDepthMap(bpy.types.Operator):
     def invoke(self, context, event):
         engine = bpy.data.scenes["Scene"].render.engine
         use_aa = bpy.data.scenes["Scene"].render.use_antialiasing
+        colspace = bpy.data.scenes[0].display_settings.display_device
+        bpy.data.scenes[0].display_settings.display_device = "None"
         bpy.data.scenes["Scene"].render.use_antialiasing = False
         
         bpy.data.scenes["Scene"].render.engine = "BLENDER_RENDER"
@@ -186,7 +200,6 @@ class MakeDepthMap(bpy.types.Operator):
         renderMat.node_tree.nodes['ZScale'].inputs[1].default_value = cos(a)
         
         scale = (ry / 256) * cos(a) / sy
-        print(scale)
         renderMat.node_tree.nodes['Scale'].inputs[1].default_value = scale
                 
         orig_materials = {}
@@ -197,7 +210,6 @@ class MakeDepthMap(bpy.types.Operator):
             if k != 'RenderDummy':
                 orig_materials[k] = []
                 for i in range(len(m.materials)):
-                    print(i)
                     orig_materials[k].append(m.materials[i])
                     m.materials[i] = renderMat
 
@@ -214,6 +226,8 @@ class MakeDepthMap(bpy.types.Operator):
         bpy.data.scenes["Scene"].use_nodes = use_compositor
         bpy.data.scenes["Scene"].render.engine = engine
         bpy.data.scenes["Scene"].render.use_antialiasing = use_aa
+        
+        bpy.data.scenes[0].display_settings.display_device = colspace
         
         return {"FINISHED"}
 
