@@ -56,7 +56,7 @@ end
 
 
 function projectPoint(p)
-	return p[1], 600 - p[2] / 2 - math.sin(60 * 3.14159 / 180.0) * p[3], 600 - (1200 - p[2] - p[3]) * 0.5
+	return p[1], 600 - p[2] / 2 - math.sin(60 * 3.14159 / 180.0) * p[3], 600 - (1200 - p[2]) * 0.5 - p[3] * math.sin(30 / 180 *3.14159)
 end
 
 
@@ -111,8 +111,8 @@ function love.draw()
   love.graphics.draw(colc)
 
   love.graphics.setShader(fgshader)
-	local gx, gy, gz = projectPoint({bx, bz, 40 + math.sin(t*5)*40})
-  fgshader:send("depth", gz):w
+	local gx, gy, gz = projectPoint({bx, bz, h})
+  fgshader:send("depth", gz)
 
   love.graphics.draw(bal, gx, gy, 0, 1, 1, 32, 58)
 
@@ -122,12 +122,17 @@ function love.draw()
   love.graphics.print(love.timer.getFPS(), 10, 10)
   local dir, dig = depi:getPixel(bx, bz / 2)
   local dd = dig * 256 + dir
-  love.graphics.print("X=" .. bx .. "\nY=" .. bz .. "\nGY=" .. gy .. "\nGZ=".. gz .. "\nD=" .. depth(gy, gz), 500)
+  love.graphics.print("H=" .. h, 300, 10)
   love.graphics.setColor(255,0,0)
+
+  if intri then
+    local t = projectVerts(intri.verts)
+    love.graphics.polygon('line', t)
+  end
   
 
 	local a, b = projectPoint(ob.Empty.pos)
-	love.graphics.rectangle('fill', a-5, b-5, 10, 10)
+	love.graphics.rectangle('fill', bx-5, 600-bz/2-5, 10, 10)
 
   love.graphics.setColor(255, 255, 255)
 
@@ -168,8 +173,9 @@ function love.update(dt)
   end
 
   for i, t in ipairs(cm) do
-		local inside = pointInTriangle({bx, 1200-bz}, t.verts)
+		local inside = pointInTriangle({bx, bz}, t.verts)
 		if inside then
+      intri = t
 			h = heightOnTriangle({bx, 1200-bz}, t.verts)
 		end
   end
