@@ -52,6 +52,13 @@ function love.load()
   f = 0
   bz = 600
   bx = 400
+  for i, t in ipairs(cm) do
+		local inside = pointInTriangle({bx, bz}, t.verts)
+		if inside then
+      intri = t
+			h = heightOnTriangle({bx, bz}, t.verts)
+		end
+  end
 end
 
 
@@ -89,9 +96,6 @@ function triangleArea(v1, v2, v3)
 end
 
 
-print(triangleArea({0,0}, {10,5}, {3,8}))
-
-
 function heightOnTriangle(p, verts)
 	local at = triangleArea(verts[1], verts[2], verts[3])
 	local a1 = triangleArea(p, verts[2], verts[3])
@@ -126,17 +130,17 @@ function love.draw()
   love.graphics.print(love.timer.getFPS(), 10, 10)
   local dir, dig = depi:getPixel(bx, bz / 2)
   local dd = dig * 256 + dir
-  love.graphics.print("H=" .. h, 300, 10)
+  --love.graphics.print("H=" .. h, 300, 10)
   love.graphics.setColor(255,0,0)
 
   if intri then
     local t = projectVerts(intri.verts)
-    love.graphics.polygon('line', t)
+   -- love.graphics.polygon('line', t)
   end
   
 
 	local a, b = projectPoint(ob.Empty.pos)
-	love.graphics.rectangle('fill', bx-5, 600-bz/2-5, 10, 10)
+	--love.graphics.rectangle('fill', bx-5, 600-bz/2-5, 10, 10)
 
   love.graphics.setColor(255, 255, 255)
 
@@ -160,6 +164,9 @@ function love.update(dt)
 
   local dd = 200
 
+  local lx = bx
+  local ly = bz
+
   if love.keyboard.isDown('up') then
     bz = bz + dd * dt
   end
@@ -176,12 +183,27 @@ function love.update(dt)
     bx = bx + dd * dt
   end
 
-  for i, t in ipairs(cm) do
-		local inside = pointInTriangle({bx, bz}, t.verts)
-		if inside then
-      intri = t
-			h = heightOnTriangle({bx, bz}, t.verts)
-		end
+  local lit = intri
+  local inside = pointInTriangle({bx, bz}, intri.verts)
+  if not inside then
+    for i, t in ipairs(intri.neighbors) do
+      if t > 0 then
+        inside = pointInTriangle({bx, bz}, cm[t].verts)
+        if inside then
+          intri = cm[t]
+          break
+        end
+      end
+    end
   end
+
+  if inside then
+    h = heightOnTriangle({bx, bz}, intri.verts)
+  else
+    intri = lit
+    bx = lx
+    bz = ly
+  end
+
 end
 
