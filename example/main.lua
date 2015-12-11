@@ -1,8 +1,20 @@
+function sign(p1, p2, p3)
+	return (p1[1] - p3[1]) * (p2[2] - p3[2]) - (p2[1] - p3[1]) * (p1[2] - p3[2])
+end
 
+
+function pointInTriangle(p, verts)
+	local b1 = sign(p, verts[1], verts[2]) < 0
+	local b2 = sign(p, verts[2], verts[3]) < 0
+	local b3 = sign(p, verts[3], verts[1]) < 0
+
+	return (b1 == b2) and (b2 == b3)
+end
 
 
 function love.load()
   cm = love.filesystem.load('test_collision.lua')()
+	ob = love.filesystem.load('test_objects.lua')()
 
   t = 0
   depi = love.image.newImageData("test_depth.png")
@@ -38,19 +50,53 @@ function love.load()
   fgshader:send('depthMap', depc)
   bgshader:send('depthMap', dep)
   f = 0
-  bz = 300
+  bz = 600
   bx = 400
+end
+
+
+function projectPoint(p)
+	return p[1], 600 - p[2] / 2 - math.sin(60 * 3.14159 / 180.0) * p[3], 600 - (1200 - p[2] - p[3]) * 0.5
 end
 
 
 function projectVerts(verts)
   local t = {}
   for i, v in ipairs(verts) do
-    t[#t+1] = v[1]
-    t[#t+1] = 600 - v[2] / 2 - math.sin(60 * 3.14159 / 180.0) * v[3]
+		t[#t+1], t[#t+2] = projectPoint(v)
   end
 
   return t
+end
+
+
+
+
+
+function len(v1, v2)
+	local x = v1[1] - v2[1]
+	local y = v1[2] - v2[2]
+	return math.sqrt(x*x+y*y)
+end
+
+
+function triangleArea(v1, v2, v3)
+	local a = len(v1, v2)
+	local b = len(v2, v3)
+	local c = len(v3, v1)
+	local s = (a+b+c)/2
+	return math.sqrt(s*(s-a)*(s-b)*(s-c))
+end
+
+
+
+function heightOnTriangle(p, verts)
+	local at = triangleArea(verts[1], verts[2], verts[3])
+	local a1 = triangleArea(p, verts[2], verts[3])
+	local a2 = triangleArea(p, verts[1], verts[3])
+	local a3 = triangleArea(p, verts[1], verts[2])
+
+	return (verts[1][3] * a1 + verts[2][3] * a2 + verts[3][3] * a3) / at
 end
 
 
@@ -65,31 +111,31 @@ function love.draw()
   love.graphics.draw(colc)
 
   love.graphics.setShader(fgshader)
-  fgshader:send("depth", d)
-  love.graphics.draw(bal, bx, bz / 2, 0, 1, 1, 32, 58)
+	local gx, gy, gz = projectPoint({bx, bz, 40 + math.sin(t*5)*40})
+  fgshader:send("depth", gz):w
+
+  love.graphics.draw(bal, gx, gy, 0, 1, 1, 32, 58)
 
   love.graphics.setShader()
 
   love.graphics.setColor(0,0,0)
   love.graphics.print(love.timer.getFPS(), 10, 10)
---  local dir, dig = depi:getPixel(bx, bz / 2)
---  print(dir, dig)
---  local dd = dig * 256 + dir
---  love.graphics.print("" .. bx .. ", " .. bz .. ": " .. d .. "/" .. dd, 10, 24)
+  local dir, dig = depi:getPixel(bx, bz / 2)
+  local dd = dig * 256 + dir
+  love.graphics.print("X=" .. bx .. "\nY=" .. bz .. "\nGY=" .. gy .. "\nGZ=".. gz .. "\nD=" .. depth(gy, gz), 500)
   love.graphics.setColor(255,0,0)
   
-  for i, t in ipairs(cm) do
-    love.graphics.polygon("line", projectVerts(t.verts))
-  end
 
+	local a, b = projectPoint(ob.Empty.pos)
+	love.graphics.rectangle('fill', a-5, b-5, 10, 10)
 
   love.graphics.setColor(255, 255, 255)
 
 end
 
 
-function depth(y)
-  local e = 600 - y / 2
+function depth(y, z)
+  local e = 600 - (1200-y-z) / 2
   return e
 end
 
@@ -101,16 +147,16 @@ function love.update(dt)
   --bz = 600+200*math.cos(t)
 
   --bz = 512
-  d  = depth(bz)
+  d  = depth(bz, 0)
 
   local dd = 200
 
   if love.keyboard.isDown('up') then
-    bz = bz - dd * dt
+    bz = bz + dd * dt
   end
 
   if love.keyboard.isDown('down') then
-    bz = bz + dd * dt
+    bz = bz - dd * dt
   end
 
   if love.keyboard.isDown('left') then
@@ -119,6 +165,13 @@ function love.update(dt)
 
   if love.keyboard.isDown('right') then
     bx = bx + dd * dt
+  end
+
+  for i, t in ipairs(cm) do
+		local inside = pointInTriangle({bx, 1200-bz}, t.verts)
+		if inside then
+			h = heightOnTriangle({bx, 1200-bz}, t.verts)
+		end
   end
 end
 
